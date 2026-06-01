@@ -1,14 +1,9 @@
 COMPOSE ?= docker compose
-CORE_SERVICES ?= nginx rabbitmq postgres
-DEBUG_SERVICES ?= grafana loki promtail prometheus cadvisor network_exporter packet_capture
 
-.PHONY: up debug-up down ps logs config
+.PHONY: up down ps logs config
 
 up:
-	$(COMPOSE) up -d --no-deps $(CORE_SERVICES)
-
-debug-up:
-	$(COMPOSE) up -d $(DEBUG_SERVICES)
+	$(COMPOSE) up -d
 
 down:
 	$(COMPOSE) down

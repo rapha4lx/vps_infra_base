@@ -14,7 +14,6 @@ services:
       - ./nginx/error.html:/usr/share/nginx/html/error.html:ro
     networks:
       - nginx
-      - debug
     depends_on:
       - rabbitmq
       - postgres
@@ -36,7 +35,6 @@ services:
       retries: 5
     networks:
       - nginx
-      - debug
 
   postgres:
     image: postgres:16-alpine
@@ -55,124 +53,10 @@ services:
       retries: 5
     networks:
       - nginx
-      - debug
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: debug_grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost/grafana/}
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - debug
-    depends_on:
-      - loki
-      - prometheus
-
-  loki:
-    image: grafana/loki:2.9.8
-    container_name: debug_loki
-    restart: unless-stopped
-    command: -config.file=/etc/loki/config.yml
-    volumes:
-      - ./monitoring/loki/config.yml:/etc/loki/config.yml:ro
-      - loki_data:/loki
-    networks:
-      - debug
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: debug_promtail
-    restart: unless-stopped
-    environment:
-      DOCKER_API_VERSION: "1.44"
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    networks:
-      - debug
-    depends_on:
-      - loki
-
-  packet_capture:
-    image: nicolaka/netshoot:latest
-    container_name: debug_packet_capture
-    restart: unless-stopped
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    environment:
-      PACKET_CAPTURE_INTERFACE: ${PACKET_CAPTURE_INTERFACE:-any}
-      PACKET_CAPTURE_FILTER: ${PACKET_CAPTURE_FILTER:-((tcp or udp or icmp) and not net 172.24.0.0/16 and not port 3000 and not port 3100 and not port 9090 and not port 9080 and not port 8080)}
-    command: >
-      sh -c 'tcpdump -i "$${PACKET_CAPTURE_INTERFACE}" -nn -tttt -l "$${PACKET_CAPTURE_FILTER}"'
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: debug_prometheus
-    restart: unless-stopped
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    networks:
-      - debug
-    depends_on:
-      - cadvisor
-      - network_exporter
-
-  network_exporter:
-    image: python:3.13-alpine
-    container_name: debug_network_exporter
-    restart: unless-stopped
-    environment:
-      DEBUG_NETWORK_NAME: debug
-      NETWORK_EXPORTER_PORT: 9108
-      NETWORK_EXPORTER_FLOW_LOOKBACK: ${NETWORK_EXPORTER_FLOW_LOOKBACK:-30s}
-    command: python /opt/network-exporter/exporter.py
-    volumes:
-      - ./monitoring/network-exporter/exporter.py:/opt/network-exporter/exporter.py:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - debug
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: debug_cadvisor
-    restart: unless-stopped
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-      - /dev/disk:/dev/disk:ro
-    networks:
-      - debug
 
 volumes:
   postgres_data:
-  grafana_data:
-  loki_data:
-  prometheus_data:
 
 networks:
   nginx:
-    external: true
-  debug:
     external: true
