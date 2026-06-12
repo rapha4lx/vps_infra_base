@@ -1,0 +1,27 @@
+-- ============================================
+-- Schema do banco - TEMPLATE
+-- ============================================
+-- Copie para: projects/seu_projeto/001_schema.sql
+-- Adapte as tabelas conforme sua necessidade
+-- ============================================
+
+-- Extensões necessárias
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Enums (exemplo)
+DO $$ BEGIN
+    CREATE TYPE "StatusExemplo" AS ENUM ('ativo', 'inativo');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Tabelas (exemplo)
+CREATE TABLE IF NOT EXISTS "Exemplo" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome VARCHAR(255) NOT NULL UNIQUE,
+    status "StatusExemplo" NOT NULL DEFAULT 'ativo',
+    "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+    "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- Índices (exemplo)
+CREATE INDEX IF NOT EXISTS "idx_Exemplo_status" ON "Exemplo"(status);
