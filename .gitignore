@@ -2,3 +2,4 @@
 node_modules
 postgres_data
 __pycache__/
+**/config.env

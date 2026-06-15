@@ -1,0 +1,9 @@
+-- ============================================
+-- Seed data - TEMPLATE (opcional)
+-- ============================================
+-- Copie para: projects/seu_projeto/002_seed.sql
+-- Adapte os dados iniciais do seu projeto
+-- ============================================
+
+-- INSERT INTO "Exemplo" (id, nome, status) VALUES
+-- ('550e8400-e29b-41d4-a716-446655440000', 'Registro Inicial', 'ativo');
