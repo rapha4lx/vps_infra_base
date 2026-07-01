@@ -7,16 +7,18 @@ services:
       - "${NGINX_HTTP_PORT:-80}:80"
       - "6380:6380"
       - "5433:5433"
+      - "6379:6379"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/fallback.conf:/etc/nginx/conf.d/fallback.conf
       - ./nginx/error.html:/usr/share/nginx/html/error.html:ro
     networks:
-      - nginx
+      - nginx-network
     depends_on:
       - rabbitmq
       - postgres
+      - redis
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -35,7 +37,22 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - nginx
+      - nginx-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: nginx_redis
+    restart: unless-stopped
+    command: sh -c "test -s /data/users.acl || printf 'user default on >%s sanitize-payload ~* &* +@all\\n' '${REDIS_PASSWORD}' > /data/users.acl; exec redis-server --appendonly yes --aclfile /data/users.acl"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nginx-network
 
   postgres:
     image: postgres:16-alpine
@@ -53,12 +70,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - nginx
+      - nginx-network
 
 volumes:
   postgres_data:
   rabbitmq_data:
+  redis_data:
 
 networks:
-  nginx:
+  nginx-network:
     external: true
