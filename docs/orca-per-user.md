@@ -29,7 +29,7 @@ assignment and is **not** an Orca official port convention. Inspect existing
 listeners before using it. The installer enables `loginctl enable-linger`
 and runs Orca's documented per-user service install command as that user.
 
-## Manual first-time binary prerequisite
+## First-time binary installation
 
 Install a verified .deb from Orca's official Downloads or tagged GitHub
 release, then verify `command -v orca-ide` and `orca-ide --version`.
