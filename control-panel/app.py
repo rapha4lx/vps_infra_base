@@ -18,6 +18,7 @@ import user_lifecycle
 import tool_catalog
 import tool_executor
 import traefik_setup
+import install_jobs
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -373,7 +374,7 @@ def catalog_install(body: ToolSelection, request: Request, session=Depends(curre
         details = tool_catalog.plan(body.tool, body.users)
         if not details["supported"]:
             raise HTTPException(409, "Vendor installation not yet safely supported")
-        return tool_executor.execute(body.tool, body.users)
+        return install_jobs.submit(body.tool, body.users, session['user'], tool_executor.execute)
     except (ValueError, KeyError) as exc:
         raise HTTPException(422, str(exc)) from exc
     except (OSError, subprocess.SubprocessError) as exc:
@@ -399,3 +400,21 @@ def traefik_stage(request: Request, session=Depends(current)):
         raise HTTPException(409, str(exc)) from exc
     except (OSError, RuntimeError) as exc:
         raise HTTPException(500, "Traefik staging failed; inspect host logs") from exc
+
+
+@app.get("/api/jobs")
+def installation_jobs(session=Depends(current)):
+    return install_jobs.list_jobs()
+
+
+@app.get("/api/jobs/{job_id}")
+def installation_job(job_id: str, session=Depends(current)):
+    item=install_jobs.get(job_id)
+    if item is None:
+        raise HTTPException(404,"Job not found")
+    return item
+
+
+@app.on_event("startup")
+def recover_jobs():
+    install_jobs.mark_interrupted()
