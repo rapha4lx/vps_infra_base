@@ -63,3 +63,15 @@ checking for running terminal sessions.
 
 The current privileged panel executor has not completed security isolation
 and must be validated only on a disposable test VPS.
+
+## Installation status and retries
+
+Installed global packages are checked via dpkg-query, and per-user npm CLI
+packages are checked using npm list with that account's HOME and npm prefix.
+Already configured Orca per-user services are not reconfigured. The app catalog
+hides already installed tools for the selected scope; the server also treats
+reinstallation as a successful no-op to avoid duplicated setup.
+
+Version upgrades are **not** performed implicitly by clicking Install again.
+System-level Orca is not silently upgraded; version-pinned upgrades should
+include session checks, explicit rollback and a dedicated separate control.
