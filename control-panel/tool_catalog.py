@@ -12,7 +12,9 @@ CATALOG = {
     "podman": {"title": "Podman rootless", "scope": "global", "packages": ["podman", "uidmap", "slirp4netns"]},
     "claude": {"title": "Claude Code CLI", "scope": "user", "npm": "@anthropic-ai/claude-code"},
     "opencode": {"title": "OpenCode CLI", "scope": "user", "npm": "@opencode/cli"},
-    "orca": {"title": "Orca Remote Server (por usuário)", "scope": "user", "managed": "orca",\n             "details": "Requer binário orca-ide instalado no host. Configura serviço systemd user independente; pareamento feito pelo usuário."},\n    "antigravity": {"title": "Google Antigravity CLI", "scope": "user", "manual": True,
+    "orca": {"title": "Orca Remote Server (por usuário)", "scope": "user", "managed": "orca",
+             "details": "Requer binário orca-ide instalado no host. Configura serviço systemd user independente; pareamento feito pelo usuário."},
+    "antigravity": {"title": "Google Antigravity CLI", "scope": "user", "manual": True,
                     "details": "Native vendor installer requires review; not executed from admin web UI."},
 }
 USERNAME = re.compile(r"^[a-z_][a-z0-9_-]{0,30}$")
