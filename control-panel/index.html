@@ -1,26 +1,54 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VPS Control</title>
-<style>body{background:#0b1020;color:#e2e8f0;font:15px system-ui;margin:0}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:28px}section{background:#171e30;border:1px solid #2c3853;border-radius:12px;padding:18px;margin:16px 0}input,select,button{background:#101827;border:1px solid #475569;border-radius:7px;color:inherit;padding:10px;margin:4px}button{cursor:pointer;background:#293f65}button:hover{background:#365984}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #35415a;padding:9px;text-align:left}pre{background:#05080e;padding:12px;overflow:auto}#terminal{height:300px;overflow:auto;background:#05080e;white-space:pre-wrap;padding:12px;font:13px monospace}#termline{width:90%}.muted{color:#94a3b8}</style></head><body><main><h1>VPS Control <small class="muted">localhost:8083</small></h1>
-<section id="auth"><h2>Entrar com conta Linux</h2><form id="login"><input id="loginUser" autocomplete="username" placeholder="Usuário" required><input id="loginPass" type="password" autocomplete="current-password" placeholder="Senha" required><button>Entrar</button></form></section>
-<div id="admin" hidden>
-<section><button onclick="logout()">Encerrar sessão</button> <span id="who"></span></section>
-<section><h2>Usuários</h2><div id="users"></div><form id="adduser"><input id="newuser" placeholder="Novo usuário" pattern="[a-z_][a-z0-9_-]{0,30}" required><button>Criar usuário</button></form><p class="muted">Nova conta criada com senha bloqueada. Defina SSH key e/ou senha manualmente por canal seguro.</p></section>
-<section><h2>Grupos</h2><div id="groups"></div><form id="addgroup"><input id="newgroup" placeholder="Novo grupo" required><button>Criar grupo</button></form><form id="membership"><input id="memberUser" placeholder="Usuário" required><input id="memberGroup" placeholder="Grupo" required><button>Adicionar ao grupo</button></form></section>
-<section><h2>Ferramentas</h2><div id="tools"></div><p class="muted">Catálogo em modo informativo; instalação administrativa pendente.</p></section>
-<section><h2>Containers Podman descobertos</h2><pre id="containers"></pre><p class="muted">Inventário de leitura. Adoção e terminal web dependem de políticas adicionais.</p></section>
-<section><h2>Sessões do host</h2><button onclick="load()">Atualizar</button><pre id="sessions"></pre></section>
-</div><p id="status"></p></main><script>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VPS Control</title>
+<style>
+:root{font-family:system-ui,sans-serif;color-scheme:dark;background:#0b1120;color:#e2e8f0}*{box-sizing:border-box}body{margin:0}
+header{padding:22px 32px;background:#111b2d;border-bottom:1px solid #253550;display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:23px}h2{font-size:18px;margin:0 0 15px}p{color:#99a9bc}main{max-width:1180px;margin:25px auto;padding:0 18px}
+.card{background:#151f32;border:1px solid #2c3d56;border-radius:12px;padding:20px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.stat{background:#1d2b42;padding:17px;border-radius:10px;font-size:29px;font-weight:bold}
+.stat small{display:block;font-size:12px;font-weight:normal;color:#b7c6d8;margin-top:6px}
+input,button{background:#0d1728;border:1px solid #42546f;color:inherit;border-radius:7px;padding:9px;margin:3px}
+button{cursor:pointer;background:#294669}button:hover{background:#365a86}button:disabled{opacity:.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #33435b;text-align:left;font-size:13px;word-break:break-word}
+.scroll{overflow-x:auto}.muted{color:#a4b4c9;font-size:13px}.tag{display:inline-block;border:1px solid #466181;border-radius:20px;padding:4px 8px;font-size:12px}
+#error{color:#ffb4b4;white-space:pre-wrap}#auth{max-width:500px;margin:55px auto}nav{display:flex;gap:8px;flex-wrap:wrap}nav button.active{background:#57779e}
+</style></head><body>
+<header><h1>VPS Control <span class="tag">8083 · loopback</span></h1><span id="identity"></span></header>
+<main>
+<section class="card" id="auth"><h2>Entrar com conta Linux autorizada</h2><form id="login"><input id="loginUser" placeholder="Usuário" autocomplete="username" required><input id="loginPass" type="password" placeholder="Senha" autocomplete="current-password" required><button>Entrar</button></form><p>Acesso via túnel SSH. Contas precisam pertencer a vps-panel-admins.</p></section>
+<div id="dashboard" hidden>
+<nav id="tabs"><button data-tab="overview" class="active">Visão geral</button><button data-tab="users">Usuários</button><button data-tab="containers">Containers</button><button data-tab="routing">Publicação</button><button data-tab="security">Segurança</button></nav>
+<div id="overview" class="tab"><section class="card"><h2>Infraestrutura</h2><div class="grid"><div class="stat" id="userCount">—<small>Usuários</small></div><div class="stat" id="containerCount">—<small>Containers descobertos</small></div><div class="stat" id="externalCount">—<small>Containers externos</small></div><div class="stat" id="sessionCount">—<small>Sessões do painel</small></div></div><p class="muted">Inventário observado; não representa garantia de saúde ou boot automático.</p><button id="refresh">Atualizar inventário</button></section></div>
+<div id="users" class="tab" hidden><section class="card"><h2>Usuários Linux</h2><div class="scroll"><table><thead><tr><th>Usuário</th><th>UID</th><th>Grupos</th></tr></thead><tbody id="usersBody"></tbody></table></div></section><section class="card"><h2>Criar usuário</h2><form id="addUser"><input id="newUser" placeholder="Nome" pattern="[a-z_][a-z0-9_-]{0,30}" required><button>Criar</button></form><p class="muted">A nova conta é criada sem senha utilizável e sem sudo.</p></section><section class="card"><h2>Grupos</h2><p id="groupList"></p><form id="addGroup"><input id="newGroup" placeholder="vps-equipe" pattern="vps-[a-z0-9_-]+" required><button>Criar grupo</button></form><form id="addMember"><input id="memberUser" placeholder="Usuário" required><input id="memberGroup" placeholder="vps-equipe" required><button>Adicionar membro</button></form></section></div>
+<div id="containers" class="tab" hidden><section class="card"><h2>Containers rootless detectados</h2><div class="scroll"><table><thead><tr><th>Dono</th><th>Container</th><th>Imagem</th><th>Estado</th><th>Origem</th><th>Boot</th></tr></thead><tbody id="containersBody"></tbody></table></div><p class="muted">Adoção de containers externos e botões de controle serão habilitados após o executor privilegiado ser implementado.</p></section></div>
+<div id="routing" class="tab" hidden><section class="card"><h2>Publicação via Traefik</h2><p>Rotas devem passar por aprovação e validação do gateway privado. Nenhuma porta pública de aplicações é liberada pelo painel nesta versão.</p><p class="tag">Publicação automática ainda indisponível</p></section></div>
+<div id="security" class="tab" hidden><section class="card"><h2>Sessões do sistema</h2><pre id="sessionData"></pre><button id="logout">Encerrar minha sessão</button></section><section class="card"><h2>Ferramentas reconhecidas</h2><p id="toolList"></p><p class="muted">Instalação pelo painel aguarda executor restrito e auditoria.</p></section></div>
+</div><p id="error" role="alert"></p></main>
+<script>
 let csrf='';
-const $=id=>document.getElementById(id);
-async function api(url,method='GET',body=null){const o={method,credentials:'same-origin',headers:{'X-CSRF-Token':csrf}};if(body!==null){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body)}const r=await fetch('/api'+url,o);const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);return d}
-function msg(t){$('status').textContent=t}
-async function load(){try{const me=await api('/me');csrf=me.csrf;$('auth').hidden=true;$('admin').hidden=false;$('who').textContent='Conectado: '+me.user;const [users,groups,tools,sessions,containers]=await Promise.all([api('/users'),api('/groups'),api('/tools'),api('/sessions'),api('/containers')]);$('users').innerHTML='<table><tr><th>Usuário</th><th>UID</th><th>Grupos</th></tr>'+users.map(u=>'<tr><td>'+escapeHtml(u.name)+'</td><td>'+u.uid+'</td><td>'+escapeHtml(u.groups.join(', '))+'</td></tr>').join('')+'</table>';$('groups').textContent=groups.map(g=>g.name).join(', ');$('tools').innerHTML=tools.map(t=>'<p>'+escapeHtml(t.id)+' — '+escapeHtml(t.description)+'</p>').join('');$('sessions').textContent=JSON.stringify(sessions,null,2);$('containers').textContent=JSON.stringify(containers,null,2)}catch(e){$('auth').hidden=false;$('admin').hidden=true;msg(e.message)}}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-$('login').onsubmit=async e=>{e.preventDefault();try{const d=await api('/login','POST',{user:$('loginUser').value,password:$('loginPass').value});csrf=d.csrf;$('loginPass').value='';await load()}catch(x){msg(x.message)}};
-$('adduser').onsubmit=async e=>{e.preventDefault();try{await api('/users','POST',{name:$('newuser').value});await load()}catch(x){msg(x.message)}};
-$('addgroup').onsubmit=async e=>{e.preventDefault();try{await api('/groups','POST',{name:$('newgroup').value});await load()}catch(x){msg(x.message)}};
-$('membership').onsubmit=async e=>{e.preventDefault();try{await api('/groups/member','POST',{user:$('memberUser').value,group:$('memberGroup').value});await load()}catch(x){msg(x.message)}};
-async function logout(){await api('/logout','POST');csrf='';$('admin').hidden=true;$('auth').hidden=false}
+const el=id=>document.getElementById(id);
+const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cell=v=>'<td>'+escape(v)+'</td>';
+function error(e){el('error').textContent=e?.message||String(e)}
+async function api(path,method='GET',body){const headers={'X-CSRF-Token':csrf};if(body!==undefined)headers['Content-Type']='application/json';const response=await fetch('/api'+path,{method,credentials:'same-origin',headers,body:body===undefined?undefined:JSON.stringify(body)});const data=await response.json();if(!response.ok)throw Error(data.detail||'HTTP '+response.status);return data}
+async function load(){try{
+ const me=await api('/me');csrf=me.csrf;el('auth').hidden=true;el('dashboard').hidden=false;el('identity').textContent=me.user;
+ const [users,groups,containers,sessions,tools]=await Promise.all([api('/users'),api('/groups'),api('/containers'),api('/sessions'),api('/tools')]);
+ const all=containers.flatMap(u=>(u.containers||[]).map(c=>({...c,user:u.user})));
+ el('userCount').innerHTML=users.length+'<small>Usuários</small>';el('containerCount').innerHTML=all.length+'<small>Containers descobertos</small>';el('externalCount').innerHTML=all.filter(c=>c.origin==='external').length+'<small>Containers externos</small>';el('sessionCount').innerHTML=sessions.panel.length+'<small>Sessões do painel</small>';
+ el('usersBody').innerHTML=users.map(u=>'<tr>'+cell(u.name)+cell(u.uid)+cell((u.groups||[]).join(', '))+'</tr>').join('');
+ el('groupList').textContent=groups.map(g=>g.name).join(', ')||'Nenhum grupo não-sistema encontrado';
+ el('containersBody').innerHTML=all.map(c=>'<tr>'+cell(c.user)+cell(c.name||c.id.slice(0,12))+cell(c.image)+cell(c.state)+cell(c.origin)+cell(c.boot_status)+'</tr>').join('');
+ el('sessionData').textContent=JSON.stringify(sessions,null,2);el('toolList').textContent=tools.map(t=>t.id+': '+t.description).join(' · ');
+ el('error').textContent='';
+}catch(e){error(e);if(String(e.message).includes('Authentication')){el('auth').hidden=false;el('dashboard').hidden=true;el('identity').textContent=''}}}
+el('login').onsubmit=async e=>{e.preventDefault();try{const d=await api('/login','POST',{user:el('loginUser').value,password:el('loginPass').value});csrf=d.csrf;el('loginPass').value='';await load()}catch(x){error(x)}};
+el('addUser').onsubmit=async e=>{e.preventDefault();try{await api('/users','POST',{name:el('newUser').value});await load()}catch(x){error(x)}};
+el('addGroup').onsubmit=async e=>{e.preventDefault();try{await api('/groups','POST',{name:el('newGroup').value});await load()}catch(x){error(x)}};
+el('addMember').onsubmit=async e=>{e.preventDefault();try{await api('/groups/member','POST',{user:el('memberUser').value,group:el('memberGroup').value});await load()}catch(x){error(x)}};
+el('logout').onclick=async()=>{try{await api('/logout','POST');csrf='';el('dashboard').hidden=true;el('auth').hidden=false;el('identity').textContent=''}catch(x){error(x)}};
+el('refresh').onclick=load;
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(t=>t.hidden=t.id!==b.dataset.tab);document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b))});
 load();
 </script></body></html>
