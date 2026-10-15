@@ -1,0 +1,17 @@
+[Unit]
+Description=VPS Control Podman rootless discovery
+Wants=default.target
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vps-infra-base/podman-monitor/monitor.py --interval 60
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h/.local/state/vps-panel
+
+[Install]
+WantedBy=default.target
