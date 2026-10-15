@@ -11,6 +11,7 @@ import subprocess
 import time
 
 import pam
+from observability import catalogue, host_metrics, security_status
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -187,9 +188,7 @@ def sessions(session=Depends(current)):
 
 @app.get("/api/tools")
 def tools(session=Depends(current)):
-    return [{"id": "podman", "description": "Podman rootless (admin install only)"},
-            {"id": "fail2ban", "description": "Host protection (admin install only)"},
-            {"id": "sudo", "description": "Privileged package (admin install only)"}]
+    return catalogue()
 
 
 @app.post("/api/tools/install")
@@ -217,3 +216,13 @@ def containers(session=Depends(current)):
         except (OSError, ValueError, TypeError):
             continue
     return result
+
+
+@app.get("/api/metrics")
+def metrics(session=Depends(current)):
+    return host_metrics()
+
+
+@app.get("/api/security/status")
+def security(session=Depends(current)):
+    return security_status()
