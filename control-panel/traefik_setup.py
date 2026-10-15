@@ -42,7 +42,9 @@ def plan():
 
 def stage():
     info = status()
-    if not shutil.which("git"):\n        raise ValueError("Git must be installed before Traefik staging")\n    if not (info["docker_running"] and info["compose_available"]):
+    if not shutil.which("git"):
+        raise ValueError("Git must be installed before Traefik staging")
+    if not (info["docker_running"] and info["compose_available"]):
         raise ValueError("Docker Engine and Compose must be running first")
     if TARGET.exists():
         raise ValueError("Traefik directory already exists; refusing to overwrite")
