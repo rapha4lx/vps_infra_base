@@ -26,7 +26,7 @@ def status(user):
                                "XDG_RUNTIME_DIR":"/run/user/"+str(record.pw_uid)})
     try:
         data=json.loads(result.stdout) if result.returncode==0 else {}
-        configured=(data.get("installed") is True or data.get("service",{}).get("installed") is True) if isinstance(data,dict) and isinstance(data.get("service",{}),dict) else False
+        configured=(data.get("installed") is True or (isinstance(data.get("service"),dict) and data["service"].get("installed") is True)) if isinstance(data,dict) else False
     except (ValueError,TypeError):
         configured=False
     return {"user":user,"installed":True,"configured":configured,"port":port,"service":"queried" if result.returncode==0 else "unavailable",
