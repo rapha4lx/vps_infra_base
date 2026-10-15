@@ -19,6 +19,7 @@ import tool_catalog
 import tool_executor
 import traefik_setup
 import install_jobs
+import orca_setup
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -418,3 +419,13 @@ def installation_job(job_id: str, session=Depends(current)):
 @app.on_event("startup")
 def recover_jobs():
     install_jobs.mark_interrupted()
+
+
+@app.get("/api/orca/{username}/status")
+def orca_user_status(username: str, session=Depends(current)):
+    try:
+        return orca_setup.status(username)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(503, "Orca service status unavailable") from exc
