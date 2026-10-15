@@ -13,6 +13,7 @@ import time
 import pam
 from observability import catalogue, host_metrics, security_status
 from session_inventory import host_sessions
+import fail2ban_config
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -259,3 +260,44 @@ def install_plan(user: str, tool: str, session=Depends(current)):
     return {"tool":tool,"target":record.pw_name,"package":catalog[tool][0],
             "description":catalog[tool][1],"executable":False,
             "reason":"Requires privileged audited installer and user-scoped allowlist"}
+
+class Fail2banSettings(BaseModel):
+    enabled: bool
+    maxretry: int = Field(ge=2, le=10)
+    findtime: str = Field(pattern=r"^[1-9][0-9]{0,3}[mh]$")
+    bantime: str = Field(pattern=r"^[1-9][0-9]{0,3}[mhd]$")
+
+
+@app.get("/api/security/fail2ban/config")
+def get_fail2ban_config(session=Depends(current)):
+    try:
+        return fail2ban_config.read()
+    except (ValueError, OSError) as exc:
+        raise HTTPException(503, "Cannot read Fail2ban configuration") from exc
+
+
+@app.post("/api/security/fail2ban/config")
+def save_fail2ban_config(body: Fail2banSettings, session=Depends(current)):
+    try:
+        return fail2ban_config.apply(body.model_dump())
+    except (ValueError, RuntimeError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/security/fail2ban/install")
+def install_fail2ban(request: Request, session=Depends(current)):
+    """Exact, allowlisted package installation; no client-supplied command."""
+    if request.headers.get("X-Confirm-Operation") != "install-fail2ban":
+        raise HTTPException(400, "Explicit confirmation required")
+    try:
+        result = subprocess.run(
+            ["/usr/bin/apt-get", "install", "-y", "--no-install-recommends",
+             "fail2ban", "python3-systemd"], check=True, timeout=240,
+            capture_output=True, text=True,
+            env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                 "DEBIAN_FRONTEND": "noninteractive"})
+        subprocess.run(["/usr/bin/systemctl", "enable", "--now", "fail2ban"],
+                       check=True, timeout=30, capture_output=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(500, "Installation failed; review system journal") from exc
+    return {"installed": True, "service": "fail2ban"}
