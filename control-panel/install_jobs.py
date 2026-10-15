@@ -62,7 +62,12 @@ def submit(tool,users,actor,runner):
         except Exception as exc:
             with LOCK:
                 job["status"]="failed";job["error"]=type(exc).__name__
-                job["step"]="Installation failed. Review server journal."
+                if isinstance(exc,ValueError):
+                    job["step"]=str(exc)[:160]
+                elif hasattr(exc,"returncode"):
+                    job["step"]="Installer exited with code "+str(exc.returncode)
+                else:
+                    job["step"]="Installation failed. Review server journal."
         finally:
             with LOCK:
                 job["updated"]=time.time();_save(job)
