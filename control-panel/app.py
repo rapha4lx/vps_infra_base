@@ -15,6 +15,8 @@ from observability import catalogue, host_metrics, security_status
 from session_inventory import host_sessions
 import fail2ban_config
 import user_lifecycle
+import tool_catalog
+import tool_executor
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -341,3 +343,37 @@ def remove_account(name: str, body: DeleteAccount, session=Depends(current)):
         raise HTTPException(409, str(exc)) from exc
     except (OSError, subprocess.SubprocessError) as exc:
         raise HTTPException(500, "Deletion failed: inspect system state before retrying") from exc
+
+class ToolSelection(BaseModel):
+    tool: str = Field(min_length=1, max_length=40)
+    users: list[str] = Field(default_factory=list, max_length=30)
+
+
+@app.get("/api/catalog")
+def get_catalog(session=Depends(current)):
+    return tool_catalog.available_tools()
+
+
+@app.post("/api/catalog/plan")
+def catalog_plan(body: ToolSelection, session=Depends(current)):
+    try:
+        return tool_catalog.plan(body.tool, body.users)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/api/catalog/install")
+def catalog_install(body: ToolSelection, request: Request, session=Depends(current)):
+    # Explicit confirmation with matching tool. Only fixed catalog operations,
+    # never arbitrary package IDs, commands, file paths or URLs.
+    if request.headers.get("X-Confirm-Operation") != "install:" + body.tool:
+        raise HTTPException(400, "Explicit tool confirmation required")
+    try:
+        details = tool_catalog.plan(body.tool, body.users)
+        if not details["supported"]:
+            raise HTTPException(409, "Vendor installation not yet safely supported")
+        return tool_executor.execute(body.tool, body.users)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(500, "Installation failed; check administrator service logs") from exc
