@@ -1,139 +1,62 @@
-# VPS Infra Base
+# VPS Infra Base — VPS Control (development branch)
 
-Base de infraestrutura local com Nginx como proxy TCP, PostgreSQL e RabbitMQ.
+Painel de controle multiusuário para VPS Ubuntu/Debian, com autenticação PAM,
+inventário Podman rootless, integração planejada com Traefik central e ferramentas
+de segurança. **Este projeto ainda é protótipo e não deve ser usado em produção
+sem revisão de segurança e testes em VM descartável.**
 
-O objetivo deste projeto é fornecer uma stack simples para subir os serviços essenciais de uma aplicação em um servidor ou ambiente local, com portas e configurações padronizadas.
+## Fluxo padrão alterado
 
-## Visão geral
+`make install` ou `sudo bash setup.sh` instala o painel no host usando systemd,
+com bind `127.0.0.1:8083`. Não cria rede Docker e **não instala nem inicia**
+Nginx, PostgreSQL ou RabbitMQ.
 
-O projeto sobe os seguintes serviços:
+A antiga stack foi movida para `legacy/docker-compose.yml` apenas para
+referência/migração: nenhum volume ou container existente será apagado pelo
+instalador.
 
-- Nginx para proxy TCP das conexões do RabbitMQ e do PostgreSQL.
-- RabbitMQ com Management UI para filas, exchanges, usuários e permissões.
-- PostgreSQL com criação padrão via variáveis de ambiente.
-
-## Arquitetura
-
-### Portas expostas
-
-- 80: Nginx.
-- 6380: acesso TCP ao RabbitMQ através do proxy do Nginx.
-- 5433: acesso TCP ao PostgreSQL através do proxy do Nginx.
-
-### Fluxo de rede
-
-As aplicações externas podem falar com o Nginx nas portas 6380 e 5433, e o Nginx encaminha para os containers internos:
-
-- RabbitMQ em nginx_rabbitmq:5672.
-- PostgreSQL em nginx_postgres:5432.
-
-## Estrutura do projeto
-
-- docker-compose.yml: define os serviços da stack.
-- nginx/nginx.conf: configuração do proxy TCP para RabbitMQ e PostgreSQL.
-- rabbitmq/rabbitmq.conf: configurações básicas do broker RabbitMQ.
-- setup.sh: cria as redes externas usadas pelo compose.
-- .env.example: variáveis de ambiente de exemplo.
-- sql_script/: scripts de inicialização e migrations de bancos PostgreSQL.
-- rabbitmq_script/: scripts de configuração de usuários, vhosts e filas RabbitMQ.
-
-## Requisitos
-
-- Docker e Docker Compose.
-- Rede Docker externa chamada nginx.
-
-Para criar a rede:
+## Instalação em ambiente de homologação
 
 ```bash
-sh setup.sh
+git checkout feat/vps-control-panel
+sudo bash setup.sh
+# Se não existir uma conta humana, o instalador pedirá usuário e senha
+# Se já existir, autorize uma conta confiável explicitamente:
+sudo usermod -aG vps-panel-admins SEU_USUARIO_LINUX_EXISTENTE
 ```
 
-## Configuração
+A partir do computador local:
+```bash
+ssh -L 8083:127.0.0.1:8083 SEU_USUARIO@HOST
+```
 
-Copie o arquivo .env.example para .env e ajuste os valores conforme o ambiente.
-
-Variáveis disponíveis:
-
-- POSTGRES_USER: usuário inicial do PostgreSQL.
-- POSTGRES_PASSWORD: senha do PostgreSQL.
-- POSTGRES_DB: banco inicial.
-- RABBITMQ_ADMIN_USER: usuário administrador do RabbitMQ.
-- RABBITMQ_ADMIN_PASS: senha do administrador do RabbitMQ.
-- RABBITMQ_DEFAULT_VHOST: vhost inicial do RabbitMQ.
-
-## Como subir a stack
-
-1. Crie a rede Docker, se ainda não existir.
+Abra `http://127.0.0.1:8083` e entre com login/senha PAM de uma conta Linux
+não-root autorizada. Não exponha 8083 diretamente à internet.
 
 ```bash
-sh setup.sh
+make status
+make logs
+make test
 ```
 
-2. Crie e ajuste o arquivo .env.
+## Componentes atuais
 
-3. Suba os serviços.
+- `control-panel/`: interface FastAPI, inventário, métricas e status básico;
+- `podman-monitor/`: monitor de eventos e Quadlets rootless;
+- `network-gateway/`: protótipo gateway Traefik → portas host loopback;
+- `traefik-routing/`: validador de labels e compilador de rotas autorizadas;
+- `security/`: instalador baseline Fail2ban/sudo/auditd;
+- `tests/e2e/`: Traefik HTTPS → backend Docker descartável.
 
-```bash
-make up
-```
+## Bloqueios para produção
 
-4. Verifique os containers.
+O backend ainda roda com privilégios altos; precisa de um executor separado
+com interface restrita, auditoria, revogação robusta de sessões e testes
+de autorização. Integração de rede privada entre Traefik e Podman, persistência
+das regras nftables, aprovação de publicação, gerenciamento de containers
+pelo painel e testes de reboot **não estão concluídos**. O smoke test Traefik
+atual utiliza Docker descartável, não prova o caminho com Podman rootless.
+O instalador não modifica SSH/firewall.
 
-```bash
-docker compose ps
-```
-
-## Acesso ao RabbitMQ
-
-Abra a interface de administração em:
-
-```text
-http://localhost/rabbitmq/
-```
-
-Use as credenciais do admin definidas em .env.
-
-## PostgreSQL inicial
-
-O PostgreSQL é inicializado apenas com as variáveis `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`, sem scripts adicionais de bootstrap.
-
-Com isso, o usuário admin definido em `.env` é o único usuário criado automaticamente pela stack.
-
-## RabbitMQ
-
-O container usa a imagem rabbitmq:3-management-alpine e carrega a configuração em rabbitmq/rabbitmq.conf.
-
-Configurações atuais:
-
-- listener TCP padrão em 5672.
-- Management UI em 15672.
-- log em console habilitado.
-
-O proxy Nginx expõe o RabbitMQ na porta 6380 para clientes TCP e também publica o painel web em /rabbitmq/.
-
-## Setup de bancos e filas
-
-Use os scripts em `sql_script/` e `rabbitmq_script/` para inicializar bancos, usuários e filas por projeto:
-
-```bash
-# PostgreSQL
-./sql_script/migrate.sh service_flow
-
-# RabbitMQ - criar usuário, vhost e permissões
-./rabbitmq_script/setup.sh service_flow
-
-# RabbitMQ - declarar filas, exchanges e bindings
-./rabbitmq_script/declare.sh service_flow
-```
-
-## Observações
-
-- O Nginx precisa da rede externa nginx para conseguir resolver os nomes dos containers.
-- O banco PostgreSQL está configurado para persistir dados em um volume nomeado.
-- O projeto foi organizado para facilitar a expansão futura com novos serviços e ambientes.
-
-## Próximos passos comuns
-
-- Ajustar permissões e vhosts do RabbitMQ para cada aplicação.
-- Criar um arquivo de produção separado para variáveis sensíveis.
-- Adicionar backup do PostgreSQL.
+A documentação adicional está em `docs/` e as propostas de integração
+com Traefik em `rapha4lx/traefik`, PR #1.

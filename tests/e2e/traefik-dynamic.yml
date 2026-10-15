@@ -1,0 +1,12 @@
+http:
+  routers:
+    sample:
+      rule: "Host(`app.test`)"
+      entryPoints: [websecure]
+      tls: {}
+      service: sample
+  services:
+    sample:
+      loadBalancer:
+        servers:
+          - url: "http://app:80"

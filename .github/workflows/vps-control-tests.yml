@@ -1,0 +1,53 @@
+name: VPS Control tests
+on:
+  push:
+    branches: [feat/vps-control-panel]
+  pull_request:
+    paths:
+      - "control-panel/**"
+      - "setup.sh"
+      - "Makefile"
+      - "legacy/**"
+      - ".github/workflows/deploy.yml"
+      - "podman-monitor/**"
+      - "traefik-routing/**"
+      - "network-gateway/**"
+      - "tests/e2e/**"
+      - ".github/workflows/vps-control-tests.yml"
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Validate syntax
+        run: python -m compileall -q control-panel podman-monitor traefik-routing network-gateway
+      - name: Validate dashboard JavaScript\n        run: |\n          python -c 'from pathlib import Path; s=Path("control-panel/index.html").read_text(); Path("/tmp/panel.js").write_text(s.split("<script>",1)[1].split("</script>",1)[0])'\n          node --check /tmp/panel.js\n      - name: Run unit tests
+        run: |
+          python -m unittest discover -s podman-monitor -p 'test_*.py' -v
+          python -m unittest discover -s traefik-routing -p 'test_*.py' -v
+          python -m unittest discover -s network-gateway -p 'test_*.py' -v
+          python -m unittest discover -s control-panel -p 'test_*.py' -v
+      - name: Validate baseline shell scripts
+        run: |
+          bash -n setup.sh control-panel/install.sh podman-monitor/install.sh podman-monitor/provision-user.sh security/install-base.sh tests/e2e/smoke.sh
+          python3 -m py_compile security/install-user-app.py
+      - name: Assert retired Compose is not in default startup
+        run: |
+          test ! -e docker-compose.yml
+          ! grep -Eq "docker network create|docker compose up" setup.sh
+          ! grep -Eq "postgres|rabbitmq|nginx" Makefile
+  traefik-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose -f tests/e2e/docker-compose.yml config --quiet
+      - name: Test TLS routing and unknown host rejection
+        run: bash tests/e2e/smoke.sh

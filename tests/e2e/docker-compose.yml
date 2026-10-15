@@ -1,0 +1,19 @@
+services:
+  app:
+    image: nginx:1.27-alpine
+    networks: [private]
+  traefik:
+    image: traefik:v3.7
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --log.level=WARN
+    volumes:
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+    ports:
+      - "127.0.0.1:18443:443"
+    networks: [private]
+    depends_on: [app]
+networks:
+  private: {}

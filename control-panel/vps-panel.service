@@ -1,0 +1,26 @@
+[Unit]
+Description=VPS Infra Base administration API (loopback only)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/vps-infra-base/control-panel
+ExecStart=/opt/vps-infra-base/control-panel/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8083 --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/etc /home /var/log /var/lib
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
