@@ -14,6 +14,7 @@ import pam
 from observability import catalogue, host_metrics, security_status
 from session_inventory import host_sessions
 import fail2ban_config
+import user_lifecycle
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -301,3 +302,42 @@ def install_fail2ban(request: Request, session=Depends(current)):
     except (OSError, subprocess.SubprocessError) as exc:
         raise HTTPException(500, "Installation failed; review system journal") from exc
     return {"installed": True, "service": "fail2ban"}
+
+class DeleteAccount(BaseModel):
+    confirmation: str
+    cleanup_home: bool = True
+
+
+@app.get("/api/users/{name}/delete-preview")
+def account_delete_preview(name: str, session=Depends(current)):
+    try:
+        if name == session["user"]:
+            raise HTTPException(403, "Cannot delete your own active admin account")
+        return user_lifecycle.preview_delete(name)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/users/{name}/ssh-key")
+def issue_ssh_key(name: str, response: Response, session=Depends(current)):
+    try:
+        value = user_lifecycle.provision_key(name)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        return value
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(400, "Could not generate SSH key for this user") from exc
+
+
+@app.delete("/api/users/{name}")
+def remove_account(name: str, body: DeleteAccount, session=Depends(current)):
+    if name == session["user"]:
+        raise HTTPException(403, "Cannot delete your own active admin account")
+    if body.confirmation != "DELETE " + name or body.cleanup_home is not True:
+        raise HTTPException(400, "Explicit account and home cleanup confirmation required")
+    try:
+        return user_lifecycle.delete_user(name)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(500, "Deletion failed: inspect system state before retrying") from exc
