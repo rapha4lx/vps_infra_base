@@ -17,6 +17,7 @@ import fail2ban_config
 import user_lifecycle
 import tool_catalog
 import tool_executor
+import traefik_setup
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -377,3 +378,24 @@ def catalog_install(body: ToolSelection, request: Request, session=Depends(curre
         raise HTTPException(422, str(exc)) from exc
     except (OSError, subprocess.SubprocessError) as exc:
         raise HTTPException(500, "Installation failed; check administrator service logs") from exc
+
+@app.get("/api/traefik/status")
+def traefik_status(session=Depends(current)):
+    return traefik_setup.status()
+
+
+@app.get("/api/traefik/plan")
+def traefik_plan(session=Depends(current)):
+    return traefik_setup.plan()
+
+
+@app.post("/api/traefik/stage")
+def traefik_stage(request: Request, session=Depends(current)):
+    if request.headers.get("X-Confirm-Operation") != "stage-traefik":
+        raise HTTPException(400, "Explicit confirmation required")
+    try:
+        return traefik_setup.stage()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(500, "Traefik staging failed; inspect host logs") from exc
