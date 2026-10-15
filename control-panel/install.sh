@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ $(id -u) -ne 0 ]]; then echo "Run as root" >&2; exit 1; fi
+[[ $EUID -eq 0 ]] || { echo "Run as root" >&2; exit 1; }
+[[ -f /etc/debian_version ]] || { echo "Ubuntu/Debian only" >&2; exit 1; }
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-dev libpam0g-dev build-essential
+apt-get install -y --no-install-recommends python3 python3-venv python3-dev libpam0g-dev build-essential
 install -d -m 0755 /opt/vps-infra-base/control-panel
-cp "$(dirname "$0")/app.py" "$(dirname "$0")/index.html" "$(dirname "$0")/requirements.txt" /opt/vps-infra-base/control-panel/
-python3 -m venv /opt/vps-infra-base/control-panel/.venv
+for file in app.py observability.py index.html requirements.txt; do
+  install -m 0644 "$DIR/$file" "/opt/vps-infra-base/control-panel/$file"
+done
+if [[ ! -x /opt/vps-infra-base/control-panel/.venv/bin/python ]]; then
+  python3 -m venv /opt/vps-infra-base/control-panel/.venv
+fi
 /opt/vps-infra-base/control-panel/.venv/bin/pip install --no-cache-dir -r /opt/vps-infra-base/control-panel/requirements.txt
+/opt/vps-infra-base/control-panel/.venv/bin/python -m compileall -q /opt/vps-infra-base/control-panel
 groupadd -f vps-panel-admins
-install -m 0644 "$(dirname "$0")/vps-panel.service" /etc/systemd/system/vps-panel.service
+install -m 0644 "$DIR/vps-panel.service" /etc/systemd/system/vps-panel.service
 systemctl daemon-reload
 systemctl enable --now vps-panel
-echo "Grant an EXISTING non-root administrator access with: usermod -aG vps-panel-admins USER"
-echo "Access through SSH tunnel: ssh -L 8083:127.0.0.1:8083 USER@YOUR_VPS"
+systemctl restart vps-panel
+systemctl is-active --quiet vps-panel || { journalctl -u vps-panel -n 40 --no-pager; exit 1; }
+echo "Panel listening only at http://127.0.0.1:8083"
+echo "Add one EXISTING trusted account to group: usermod -aG vps-panel-admins USER"
+echo "Connect with: ssh -L 8083:127.0.0.1:8083 USER@VPS"
