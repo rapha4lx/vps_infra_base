@@ -3,6 +3,7 @@
 Port allocations fixed by Linux UID; no public listener/firewall changes here.
 """
 import os
+import json
 import shutil
 import subprocess
 from tool_catalog import safe_user
@@ -23,7 +24,12 @@ def status(user):
                           capture_output=True,text=True,timeout=12,check=False,
                           env={"HOME":record.pw_dir,"USER":user,"LOGNAME":user,"PATH":"/usr/local/bin:/usr/bin:/bin",
                                "XDG_RUNTIME_DIR":"/run/user/"+str(record.pw_uid)})
-    return {"user":user,"installed":True,"port":port,"service":"queried" if result.returncode==0 else "unavailable",
+    try:
+        data=json.loads(result.stdout) if result.returncode==0 else {}
+        configured=(data.get("installed") is True or data.get("service",{}).get("installed") is True) if isinstance(data,dict) and isinstance(data.get("service",{}),dict) else False
+    except (ValueError,TypeError):
+        configured=False
+    return {"user":user,"installed":True,"configured":configured,"port":port,"service":"queried" if result.returncode==0 else "unavailable",
             "details":result.stdout[:3000] if result.returncode==0 else "",
             "note":"Pairing requires interactive Orca CLI; do not expose runtime port publicly."}
 
@@ -34,6 +40,8 @@ def configure(user, progress=None):
     binary=shutil.which("orca-ide")
     if not binary:
         raise ValueError("Orca vendor Linux application is not installed; install signed/reviewed .deb first")
+    if not shutil.which("Xvfb"):
+        raise ValueError("Orca headless requires Xvfb: install xvfb and Electron Linux libraries first")
     if not os.path.isdir("/run/systemd/system"):
         raise ValueError("systemd host required")
     progress("Enable systemd lingering for "+user)
