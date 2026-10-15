@@ -20,6 +20,7 @@ import tool_executor
 import traefik_setup
 import install_jobs
 import orca_setup
+import tool_status
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -429,3 +430,11 @@ def orca_user_status(username: str, session=Depends(current)):
         raise HTTPException(422, str(exc)) from exc
     except (OSError, subprocess.SubprocessError) as exc:
         raise HTTPException(503, "Orca service status unavailable") from exc
+
+
+@app.get("/api/catalog/installed")
+def catalog_installed(session=Depends(current)):
+    managed=[u.pw_name for u in pwd.getpwall()
+             if 1000 <= u.pw_uid < 65534 and u.pw_name != "ubuntu"
+             and u.pw_dir == "/home/" + u.pw_name]
+    return tool_status.overview(managed)
