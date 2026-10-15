@@ -7,7 +7,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends python3 python3-venv python3-dev libpam0g-dev build-essential
 install -d -m 0755 /opt/vps-infra-base/control-panel
-for file in app.py observability.py session_inventory.py user_lifecycle.py fail2ban_config.py tool_catalog.py tool_executor.py index.html requirements.txt; do
+for file in app.py observability.py session_inventory.py user_lifecycle.py fail2ban_config.py tool_catalog.py tool_executor.py traefik_setup.py index.html requirements.txt; do
   install -m 0644 "$DIR/$file" "/opt/vps-infra-base/control-panel/$file"
 done
 if [[ ! -x /opt/vps-infra-base/control-panel/.venv/bin/python ]]; then
