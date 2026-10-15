@@ -27,7 +27,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Validate syntax
         run: python -m compileall -q control-panel podman-monitor traefik-routing network-gateway
-      - name: Run unit tests
+      - name: Validate dashboard JavaScript\n        run: |\n          python -c 'from pathlib import Path; s=Path("control-panel/index.html").read_text(); Path("/tmp/panel.js").write_text(s.split("<script>",1)[1].split("</script>",1)[0])'\n          node --check /tmp/panel.js\n      - name: Run unit tests
         run: |
           python -m unittest discover -s podman-monitor -p 'test_*.py' -v
           python -m unittest discover -s traefik-routing -p 'test_*.py' -v
