@@ -155,14 +155,17 @@ def create_user(body: Named, session=Depends(current)):
 
 @app.post("/api/groups", status_code=201)
 def create_group(body: Named, session=Depends(current)):
-    command("/usr/sbin/groupadd", require_account(body.name))
-    return {"name": body.name}
+    name = require_account(body.name)
+    if not name.startswith("vps-") or name == ADMIN_GROUP:
+        raise HTTPException(403, "Only non-privileged vps-* groups may be created")
+    command("/usr/sbin/groupadd", name)
+    return {"name": name}
 
 
 @app.post("/api/groups/member")
 def add_member(body: Member, session=Depends(current)):
     user, group = require_account(body.user), require_account(body.group)
-    if group in ("root", "sudo", "docker", "adm", "shadow", "systemd-journal", ADMIN_GROUP):
+    if not group.startswith("vps-") or group == ADMIN_GROUP:
         raise HTTPException(403, "Privileged groups require out-of-band approval")
     try:
         info = pwd.getpwnam(user)
