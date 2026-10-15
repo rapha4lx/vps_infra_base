@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - "control-panel/**"
+      - "setup.sh"
+      - "Makefile"
+      - "legacy/**"
+      - ".github/workflows/deploy.yml"
       - "podman-monitor/**"
       - "traefik-routing/**"
       - "network-gateway/**"
@@ -31,7 +35,12 @@ jobs:
           python -m unittest discover -s control-panel -p 'test_observability.py' -v
       - name: Validate baseline shell scripts
         run: |
-          bash -n control-panel/install.sh podman-monitor/install.sh podman-monitor/provision-user.sh security/install-base.sh
+          bash -n setup.sh control-panel/install.sh podman-monitor/install.sh podman-monitor/provision-user.sh security/install-base.sh tests/e2e/smoke.sh
+      - name: Assert retired Compose is not in default startup
+        run: |
+          test ! -e docker-compose.yml
+          ! grep -Eq "docker network create|docker compose up" setup.sh
+          ! grep -Eq "postgres|rabbitmq|nginx" Makefile
   traefik-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
