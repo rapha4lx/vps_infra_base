@@ -9,11 +9,11 @@ cd "$(dirname "$0")"
 uid_min="$(awk '$1=="UID_MIN"{print $2;exit}' /etc/login.defs)"
 uid_min="${uid_min:-1000}"
 mapfile -t humans < <(getent passwd | awk -F: -v min="$uid_min" '
-  $3 >= min && $3 < 65534 && $1 != "nobody" && $7 !~ /(nologin|false)$/ { print $1 }
+  $3 >= min && $3 < 65534 && $1 != "nobody" && $1 != "ubuntu" && $7 !~ /(nologin|false)$/ { print $1 }
 ')
 
 if (( ${#humans[@]} == 0 )); then
-  echo "No regular login-capable Linux user found. A first administrator is required."
+  echo "No non-ubuntu regular login-capable Linux user found. A first administrator is required."
   [[ -t 0 && -t 1 ]] || { echo "Interactive terminal required to create the first account." >&2; exit 1; }
   while true; do
     read -r -p "New Linux administrator username: " new_user
@@ -44,7 +44,7 @@ if (( ${#humans[@]} == 0 )); then
   echo "Created Linux admin '$new_user' and granted panel administration."
   echo "SSH password login is not enabled by this setup. Configure an SSH public key or use provider console."
 else
-  printf "Found existing regular account(s): %s\n" "${humans[*]}"
+  printf "Found existing non-ubuntu regular account(s): %s\n" "${humans[*]}"
   echo "No account created. To authorize an existing user: sudo usermod -aG vps-panel-admins USER"
 fi
 
