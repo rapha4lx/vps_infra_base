@@ -12,6 +12,7 @@ import time
 
 import pam
 from observability import catalogue, host_metrics, security_status
+from session_inventory import host_sessions
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -183,7 +184,7 @@ def add_member(body: Member, session=Depends(current)):
 def sessions(session=Depends(current)):
     # Never expose session cookies or bearer values.
     return {"panel": [{"user": v["user"], "expires_in": max(0, int(v["expires"]-time.monotonic()))}
-                      for v in SESSIONS.values()], "host": command("/usr/bin/who").splitlines()}
+                      for v in SESSIONS.values()], "host": host_sessions()}
 
 
 @app.get("/api/tools")
@@ -226,3 +227,35 @@ def metrics(session=Depends(current)):
 @app.get("/api/security/status")
 def security(session=Depends(current)):
     return security_status()
+
+@app.get("/api/security/setup-guide")
+def setup_guide(session=Depends(current)):
+    return {
+        "baseline_command": "sudo bash security/install-base.sh",
+        "baseline_packages": ["sudo", "fail2ban", "ufw", "auditd", "unattended-upgrades"],
+        "important": "Firewall and SSH restrictions are intentionally not auto-applied.",
+        "checks": ["sudo fail2ban-client status sshd", "sudo sshd -T",
+                   "sudo ss -lntup", "sudo ufw status verbose"],
+    }
+
+
+@app.get("/api/tools/install-plan")
+def install_plan(user: str, tool: str, session=Depends(current)):
+    """Informational plan only; no side effects, no arbitrary command execution."""
+    catalog = {
+       "pipx": ("pipx", "apt host package; user apps require separate executor"),
+       "podman": ("podman uidmap", "rootless runtime requiring per-user provisioning"),
+       "git": ("git", "system-wide apt package"),
+       "fail2ban": ("fail2ban", "host security package, admin-only"),
+    }
+    if tool not in catalog:
+        raise HTTPException(422, "Unsupported tool")
+    try:
+        record = pwd.getpwnam(require_account(user))
+    except KeyError as exc:
+        raise HTTPException(404, "No such user") from exc
+    if record.pw_uid < 1000 or record.pw_name == "root":
+        raise HTTPException(403, "Cannot target system accounts")
+    return {"tool":tool,"target":record.pw_name,"package":catalog[tool][0],
+            "description":catalog[tool][1],"executable":False,
+            "reason":"Requires privileged audited installer and user-scoped allowlist"}
