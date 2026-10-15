@@ -7,6 +7,7 @@ import os
 import subprocess
 
 from tool_catalog import CATALOG, plan, safe_user
+import orca_setup
 
 
 def execute(tool, users, progress=None):
@@ -22,6 +23,9 @@ def execute(tool, users, progress=None):
                        check=True, capture_output=True, timeout=600, env=common_env)
         progress("Global packages installed")
         return {"tool":tool,"scope":"global","installed":True,"users":"all"}
+    if tool == "orca":
+        results=[orca_setup.configure(username,progress) for username in users]
+        return {"tool":"orca","scope":"user","configured":results}
     results=[]
     for username in users:
         progress("Installing " + tool + " for " + username)
