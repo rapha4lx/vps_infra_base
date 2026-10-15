@@ -1,73 +1,8 @@
-name: CI/CD Deployment
-
+name: Legacy deployment disabled
 on:
-  push:
-    branches:
-      - main
-
+  workflow_dispatch:
 jobs:
-  test:
+  notice:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          sh setup.sh
-
-      - name: Validate Docker Compose
-        run: docker compose config
-
-      - name: Smoke Test - Spin up infrastructure
-        run: |
-          # Sobe apenas os serviços de base (ignora o nginx que depende de upstreams externos)
-          docker compose up -d postgres rabbitmq
-          echo "Aguardando serviços de base ficarem prontos (healthcheck)..."
-          
-          # Tentativas de verificação de saúde (total 60 segundos)
-          for i in {1..12}; do
-            # Usando grep para capturar "(healthy)" de forma mais compatível entre versões
-            HEALTHY_COUNT=$(docker compose ps | grep -c "(healthy)" || true)
-            if [ "$HEALTHY_COUNT" == "2" ]; then
-              echo "Infraestrutura básica saudável!"
-              exit 0
-            fi
-            echo "Aguardando Postgres e RabbitMQ ($HEALTHY_COUNT/2 saudáveis)... ($((i*5))s)"
-            sleep 5
-          done
-          
-          echo "Erro: A infraestrutura básica não subiu corretamente ou o healthcheck falhou."
-          docker compose ps
-          docker compose logs
-          exit 1
-
-      - name: Shutdown test environment
-        if: always()
-        run: docker compose down
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            cd ${{ secrets.PATH }}
-            git pull origin main
-            # Garante que a rede externa exista
-            sh setup.sh || true
-            # Sobe os containers (aplica mudanças estruturais se houver)
-            docker compose up -d
-            # Reinicia especificamente o Nginx para ler as novas configurações (volumes)
-            echo "Reiniciando Nginx..."
-            docker compose restart nginx
-            # Verifica se os containers estão rodando
-            echo "Verificando containers..."
-            docker compose ps
+      - run: echo "Legacy Nginx/Postgres/RabbitMQ deployment retired. Use VPS Control tests and manually reviewed deployment."
