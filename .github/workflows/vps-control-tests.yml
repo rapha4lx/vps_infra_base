@@ -32,10 +32,11 @@ jobs:
           python -m unittest discover -s podman-monitor -p 'test_*.py' -v
           python -m unittest discover -s traefik-routing -p 'test_*.py' -v
           python -m unittest discover -s network-gateway -p 'test_*.py' -v
-          python -m unittest discover -s control-panel -p 'test_observability.py' -v
+          python -m unittest discover -s control-panel -p 'test_*.py' -v
       - name: Validate baseline shell scripts
         run: |
           bash -n setup.sh control-panel/install.sh podman-monitor/install.sh podman-monitor/provision-user.sh security/install-base.sh tests/e2e/smoke.sh
+          python3 -m py_compile security/install-user-app.py
       - name: Assert retired Compose is not in default startup
         run: |
           test ! -e docker-compose.yml
