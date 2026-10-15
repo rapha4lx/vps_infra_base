@@ -23,7 +23,8 @@ def status(user):
     result=subprocess.run(["/usr/sbin/runuser","-u",user,"--",binary,"serve","service","status","--json"],
                           capture_output=True,text=True,timeout=12,check=False,
                           env={"HOME":record.pw_dir,"USER":user,"LOGNAME":user,"PATH":"/usr/local/bin:/usr/bin:/bin",
-                               "XDG_RUNTIME_DIR":"/run/user/"+str(record.pw_uid)})
+                               "XDG_RUNTIME_DIR":"/run/user/"+str(record.pw_uid),
+                               "DBUS_SESSION_BUS_ADDRESS":"unix:path=/run/user/"+str(record.pw_uid)+"/bus"})
     try:
         data=json.loads(result.stdout) if result.returncode==0 else {}
         configured=(data.get("installed") is True or (isinstance(data.get("service"),dict) and data["service"].get("installed") is True)) if isinstance(data,dict) else False
@@ -49,6 +50,7 @@ def configure(user, progress=None):
     progress("Install Orca per-user service on port "+str(port))
     env={"HOME":record.pw_dir,"USER":user,"LOGNAME":user,
          "XDG_RUNTIME_DIR":"/run/user/"+str(record.pw_uid),
+         "DBUS_SESSION_BUS_ADDRESS":"unix:path=/run/user/"+str(record.pw_uid)+"/bus",
          "PATH":"/usr/local/bin:/usr/bin:/bin"}
     subprocess.run(["/usr/sbin/runuser","-u",user,"--",binary,"serve","service","install",
                     "--port",str(port)],check=True,capture_output=True,timeout=90,env=env)
