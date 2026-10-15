@@ -20,6 +20,8 @@ instalador.
 ```bash
 git checkout feat/vps-control-panel
 sudo bash setup.sh
+# Se não existir uma conta humana, o instalador pedirá usuário e senha
+# Se já existir, autorize uma conta confiável explicitamente:
 sudo usermod -aG vps-panel-admins SEU_USUARIO_LINUX_EXISTENTE
 ```
 
