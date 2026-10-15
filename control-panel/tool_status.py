@@ -23,8 +23,11 @@ def installed(tool,user=None):
     account=safe_user(user)
     if tool=="orca":
         from orca_setup import status
-        state=status(user)
-        return state.get("configured",False) is True
+        try:
+            state=status(user)
+            return state.get("configured",False) is True
+        except (ValueError,OSError,subprocess.SubprocessError):
+            return False
     if item.get("manual"):return False
     npm=shutil.which("npm")
     if not npm:return False
