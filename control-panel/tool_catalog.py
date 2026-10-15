@@ -8,6 +8,7 @@ import shutil
 
 CATALOG = {
     "node": {"title": "Node.js + npm", "scope": "global", "packages": ["nodejs", "npm"]},
+    "docker": {"title": "Docker Engine + Compose (distribuição)", "scope": "global", "packages": ["docker.io", "docker-compose-v2"]},
     "podman": {"title": "Podman rootless", "scope": "global", "packages": ["podman", "uidmap", "slirp4netns"]},
     "claude": {"title": "Claude Code CLI", "scope": "user", "npm": "@anthropic-ai/claude-code"},
     "opencode": {"title": "OpenCode CLI", "scope": "user", "npm": "@opencode/cli"},
