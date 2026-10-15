@@ -12,6 +12,7 @@ CATALOG = {
     "podman": {"title": "Podman rootless", "scope": "global", "packages": ["podman", "uidmap", "slirp4netns"]},
     "claude": {"title": "Claude Code CLI", "scope": "user", "npm": "@anthropic-ai/claude-code"},
     "opencode": {"title": "OpenCode CLI", "scope": "user", "npm": "@opencode/cli"},
+    "orca-host": {"title":"Orca IDE (binário oficial verificado)", "scope":"global", "packages":["orca-ide","xvfb"], "managed":"orca-host"},
     "orca": {"title": "Orca Remote Server (por usuário)", "scope": "user", "managed": "orca",
              "details": "Requer binário orca-ide instalado no host. Configura serviço systemd user independente; pareamento feito pelo usuário."},
     "antigravity": {"title": "Google Antigravity CLI", "scope": "user", "manual": True,
