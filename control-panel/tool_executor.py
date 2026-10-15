@@ -8,6 +8,7 @@ import subprocess
 
 from tool_catalog import CATALOG, plan, safe_user
 import orca_setup
+import tool_status
 
 
 def execute(tool, users, progress=None):
@@ -17,6 +18,9 @@ def execute(tool, users, progress=None):
         raise ValueError("This tool requires a separately reviewed vendor installer")
     common_env={"PATH":"/usr/sbin:/usr/bin:/sbin:/bin","DEBIAN_FRONTEND":"noninteractive"}
     if selection["scope"] == "global":
+        if tool_status.installed(tool):
+            progress("Already installed globally; skipped")
+            return {"tool":tool,"already_installed":True}
         packages=CATALOG[tool]["packages"]
         progress("Installing system packages: " + ", ".join(packages))
         subprocess.run(["/usr/bin/apt-get","install","-y","--no-install-recommends",*packages],
@@ -24,10 +28,14 @@ def execute(tool, users, progress=None):
         progress("Global packages installed")
         return {"tool":tool,"scope":"global","installed":True,"users":"all"}
     if tool == "orca":
-        results=[orca_setup.configure(username,progress) for username in users]
+        results=[orca_setup.configure(username,progress) if not tool_status.installed(tool,username) else {"user":username,"already_installed":True} for username in users]
         return {"tool":"orca","scope":"user","configured":results}
     results=[]
     for username in users:
+        if tool_status.installed(tool,username):
+            progress(tool+" already installed for "+username+"; skipped")
+            results.append(username)
+            continue
         progress("Installing " + tool + " for " + username)
         account=safe_user(username)
         home=account.pw_dir
