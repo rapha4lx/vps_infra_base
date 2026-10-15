@@ -1,5 +1,6 @@
 """Actual installation checks, per global package or target Linux account."""
 import os
+from pathlib import Path
 import shutil
 import subprocess
 from tool_catalog import CATALOG,safe_user
@@ -37,6 +38,15 @@ def installed(tool,user=None):
         except (ValueError,OSError,subprocess.SubprocessError):
             return False
     if item.get("manual"):return False
+    # Native per-user CLI installs may not be registered in npm.
+    # Resolve links and require the executable to remain inside the account HOME.
+    binary={"claude":"claude","opencode":"opencode"}.get(tool)\n    if binary:
+        candidate=Path(account.pw_dir)/".local/bin"/binary
+        try:
+            target=candidate.resolve(strict=True)
+            if target.is_relative_to(Path(account.pw_dir).resolve()) and target.is_file() and target.stat().st_uid==account.pw_uid and bool(target.stat().st_mode & 0o111):\n                return True
+        except (OSError,ValueError):
+            pass
     npm=shutil.which("npm")
     if not npm:return False
     env={"HOME":account.pw_dir,"USER":user,"LOGNAME":user,
