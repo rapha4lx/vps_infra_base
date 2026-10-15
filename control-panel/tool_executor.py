@@ -8,6 +8,7 @@ import subprocess
 
 from tool_catalog import CATALOG, plan, safe_user
 import orca_setup
+import orca_binary
 import tool_status
 
 
@@ -21,6 +22,8 @@ def execute(tool, users, progress=None):
         if tool_status.installed(tool):
             progress("Already installed globally; skipped")
             return {"tool":tool,"already_installed":True}
+        if tool == "orca-host":
+            return orca_binary.install(progress)
         packages=CATALOG[tool]["packages"]
         progress("Installing system packages: " + ", ".join(packages))
         subprocess.run(["/usr/bin/apt-get","install","-y","--no-install-recommends",*packages],
