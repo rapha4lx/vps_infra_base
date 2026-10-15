@@ -40,11 +40,13 @@ def installed(tool,user=None):
     if item.get("manual"):return False
     # Native per-user CLI installs may not be registered in npm.
     # Resolve links and require the executable to remain inside the account HOME.
-    binary={"claude":"claude","opencode":"opencode"}.get(tool)\n    if binary:
+    binary={"claude":"claude","opencode":"opencode"}.get(tool)
+    if binary:
         candidate=Path(account.pw_dir)/".local/bin"/binary
         try:
             target=candidate.resolve(strict=True)
-            if target.is_relative_to(Path(account.pw_dir).resolve()) and target.is_file() and target.stat().st_uid==account.pw_uid and bool(target.stat().st_mode & 0o111):\n                return True
+            if target.is_relative_to(Path(account.pw_dir).resolve()) and target.is_file() and target.stat().st_uid==account.pw_uid and bool(target.stat().st_mode & 0o111):
+                return True
         except (OSError,ValueError):
             pass
     npm=shutil.which("npm")
