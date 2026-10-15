@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VPS Control</title>
+<style>body{background:#0b1020;color:#e2e8f0;font:15px system-ui;margin:0}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:28px}section{background:#171e30;border:1px solid #2c3853;border-radius:12px;padding:18px;margin:16px 0}input,select,button{background:#101827;border:1px solid #475569;border-radius:7px;color:inherit;padding:10px;margin:4px}button{cursor:pointer;background:#293f65}button:hover{background:#365984}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #35415a;padding:9px;text-align:left}pre{background:#05080e;padding:12px;overflow:auto}#terminal{height:300px;overflow:auto;background:#05080e;white-space:pre-wrap;padding:12px;font:13px monospace}#termline{width:90%}.muted{color:#94a3b8}</style></head><body><main><h1>VPS Control <small class="muted">localhost:8083</small></h1>
+<section id="auth"><h2>Entrar com conta Linux</h2><form id="login"><input id="loginUser" autocomplete="username" placeholder="Usuário" required><input id="loginPass" type="password" autocomplete="current-password" placeholder="Senha" required><button>Entrar</button></form></section>
+<div id="admin" hidden>
+<section><button onclick="logout()">Encerrar sessão</button> <span id="who"></span></section>
+<section><h2>Usuários</h2><div id="users"></div><form id="adduser"><input id="newuser" placeholder="Novo usuário" pattern="[a-z_][a-z0-9_-]{0,30}" required><button>Criar usuário</button></form><p class="muted">Nova conta criada com senha bloqueada. Defina SSH key e/ou senha manualmente por canal seguro.</p></section>
+<section><h2>Grupos</h2><div id="groups"></div><form id="addgroup"><input id="newgroup" placeholder="Novo grupo" required><button>Criar grupo</button></form><form id="membership"><input id="memberUser" placeholder="Usuário" required><input id="memberGroup" placeholder="Grupo" required><button>Adicionar ao grupo</button></form></section>
+<section><h2>Ferramentas</h2><div id="tools"></div><p class="muted">Pacotes apt são globais; os pacotes pipx são instalados isoladamente no HOME selecionado.</p></section>
+<section><h2>Terminal do usuário</h2><select id="shellUser"></select><button onclick="connectTerminal()">Abrir terminal</button><button onclick="closeTerminal()">Fechar</button><pre id="terminal"></pre><input id="termline" placeholder="Digite e pressione Enter" autocomplete="off"></section>
+<section><h2>Sessões do host</h2><button onclick="load()">Atualizar</button><pre id="sessions"></pre></section>
+</div><p id="status"></p></main><script>
+let csrf='',socket=null;
+const $=id=>document.getElementById(id);
+async function api(url,method='GET',body=null){const o={method,credentials:'same-origin',headers:{'X-CSRF-Token':csrf}};if(body!==null){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body)}const r=await fetch('/api'+url,o);const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);return d}
+function msg(t){$('status').textContent=t}
+async function load(){try{const me=await api('/me');csrf=me.csrf;$('auth').hidden=true;$('admin').hidden=false;$('who').textContent='Conectado: '+me.user;const [users,groups,tools,sessions]=await Promise.all([api('/users'),api('/groups'),api('/tools'),api('/sessions')]);$('users').innerHTML='<table><tr><th>Usuário</th><th>UID</th><th>Grupos</th></tr>'+users.map(u=>'<tr><td>'+escapeHtml(u.name)+'</td><td>'+u.uid+'</td><td>'+escapeHtml(u.groups.join(', '))+'</td></tr>').join('')+'</table>';$('groups').textContent=groups.map(g=>g.name).join(', ');$('shellUser').innerHTML=users.filter(u=>u.uid>=1000).map(u=>'<option>'+escapeHtml(u.name)+'</option>').join('');$('tools').innerHTML=tools.map(t=>'<p>'+escapeHtml(t.id)+' — '+escapeHtml(t.description)+' <button data-tool="'+escapeHtml(t.id)+'">Instalar</button></p>').join('');document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=async()=>{const user=prompt('Usuário de destino (vazio para global)')||'';try{msg(JSON.stringify(await api('/tools/install','POST',{id:b.dataset.tool,user})))}catch(e){msg(e.message)}});$('sessions').textContent=JSON.stringify(sessions,null,2)}catch(e){$('auth').hidden=false;$('admin').hidden=true;msg(e.message)}}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('login').onsubmit=async e=>{e.preventDefault();try{const d=await api('/login','POST',{user:$('loginUser').value,password:$('loginPass').value});csrf=d.csrf;$('loginPass').value='';await load()}catch(x){msg(x.message)}};
+$('adduser').onsubmit=async e=>{e.preventDefault();try{await api('/users','POST',{name:$('newuser').value});await load()}catch(x){msg(x.message)}};
+$('addgroup').onsubmit=async e=>{e.preventDefault();try{await api('/groups','POST',{name:$('newgroup').value});await load()}catch(x){msg(x.message)}};
+$('membership').onsubmit=async e=>{e.preventDefault();try{await api('/groups/member','POST',{user:$('memberUser').value,group:$('memberGroup').value});await load()}catch(x){msg(x.message)}};
+async function logout(){closeTerminal();await api('/logout','POST');csrf='';$('admin').hidden=true;$('auth').hidden=false}
+function closeTerminal(){if(socket){socket.close();socket=null}}
+function connectTerminal(){closeTerminal();const u=$('shellUser').value;socket=new WebSocket('ws://'+location.host+'/ws/terminal?user='+encodeURIComponent(u)+'&csrf='+encodeURIComponent(csrf));$('terminal').textContent='';socket.onmessage=e=>{$('terminal').textContent+=e.data;$('terminal').scrollTop=$('terminal').scrollHeight};socket.onclose=()=>msg('Terminal desconectado')}
+$('termline').addEventListener('keydown',e=>{if(e.key==='Enter'&&socket?.readyState===1){socket.send(e.target.value+'\n');e.target.value=''}});
+load();
+</script></body></html>
