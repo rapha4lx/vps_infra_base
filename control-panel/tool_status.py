@@ -13,7 +13,15 @@ def _run(args,timeout=12,env=None):
 def installed(tool,user=None):
     item=CATALOG[tool]
     if item["scope"]=="global":
-        # dpkg state, not executable presence: a binary on PATH may be unrelated.
+        # Accept official/vendor installations too, not only distro package names.
+        binaries={"node": ["node","npm"], "podman":["podman"],
+                  "docker":["docker"], "orca-host":["orca-ide","Xvfb"]}
+        if tool in binaries and all(shutil.which(b) for b in binaries[tool]):
+            if tool=="docker":
+                p=_run([shutil.which("docker"),"compose","version"])
+                return p is not None and p.returncode==0
+            return True
+        # Otherwise verify distro package status:
         for pkg in item["packages"]:
             p=_run(["/usr/bin/dpkg-query","-W","-f=${Status}",pkg])
             if p is None or p.returncode or p.stdout.strip()!="install ok installed":
